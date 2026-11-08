@@ -1,0 +1,49 @@
+{
+	"Name": "Discord Clipboard Send",
+	"Version": "1.0.0.0",
+	"Author": "CaviarTheCatgirl",
+	"Description": "Send what's on your clipboard (files, an image or text) to a list of Discord people with one key: tap to send, double-tap to send as spoiler, with an optional confirmation. Needs the ClipboardSendDeck Vencord plugin.",
+	"UUID": "com.caviarthecatgirl.clipboard-send",
+	"Actions": [
+		{
+			"Name": "Clipboard Send",
+			"UUID": "com.caviarthecatgirl.clipboard-send.send",
+			"Icon": "imgs/actions/send/icon",
+			"Tooltip": "Sends the clipboard to the people on this key. Default: tap = send, double tap = send as spoiler, hold = show what's on the clipboard.",
+			"PropertyInspectorPath": "ui/clipboard-send.html",
+			"SupportedInMultiActions": false,
+			"DisableAutomaticStates": true,
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/send/key",
+					"TitleAlignment": "bottom"
+				}
+			]
+		}
+	],
+	"Category": "Discord",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"CodePath": "bin/plugin.js",
+	"Icon": "imgs/plugin/marketplace",
+	"SDKVersion": 3,
+	"Software": {
+		"MinimumVersion": "6.9"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "12"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		}
+	],
+	"Nodejs": {
+		"Version": "20",
+		"Debug": "enabled"
+	}
+}

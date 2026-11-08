@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+<meta charset="utf-8" />
+<title>Clipboard Send</title>
+<style>
+    :root { --bg: #2d2d2d; --card: #3a3a3a; --line: #4a4a4a; --text: #d0d0d0; --dim: #9a9a9a; --accent: #5865f2; --green: #3ba55d; --red: #ed4245; --amber: #faa61a; --spoiler: #c9a0ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 12px 14px 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: var(--text); background: var(--bg); }
+    h3 { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
+    h3 .grow { flex: 1; }
+    h3 a { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--accent); cursor: pointer; }
+    h3 a.danger { color: var(--red); }
+    .status { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; background: var(--card); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--amber); flex: none; }
+    .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.off { background: var(--red); }
+    .status .txt { flex: 1; line-height: 1.4; }
+    .status .txt small { display: block; color: var(--dim); }
+    button { font: inherit; color: var(--text); background: #4a4a4a; border: 1px solid #555; border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+    button:hover:not(:disabled) { background: #555; }
+    button:disabled { opacity: .45; cursor: default; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    input[type=text], input[type=number], select, textarea { font: inherit; color: var(--text); background: #242424; border: 1px solid var(--line); border-radius: 4px; padding: 5px 7px; width: 100%; }
+    textarea { resize: vertical; min-height: 54px; line-height: 1.4; }
+    input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
+    .av { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); flex: none; object-fit: cover; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; overflow: hidden; }
+    .av.sm { width: 28px; height: 28px; font-size: 11px; }
+    .av.xs { width: 20px; height: 20px; font-size: 9px; }
+    .people { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px; border-radius: 8px; background: var(--card); min-height: 40px; }
+    .people .none { color: var(--dim); align-self: center; padding: 2px 4px; }
+    .pchip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 2px 4px 2px 2px; border-radius: 999px; background: #4a4a4a; }
+    .pchip .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+    .pchip .rm { width: 18px; height: 18px; padding: 0; line-height: 16px; border-radius: 50%; background: transparent; border: none; color: var(--dim); font-size: 12px; }
+    .pchip .rm:hover { color: #fff; background: var(--red); }
+    .picker { margin-top: 8px; }
+    .searchrow { display: flex; gap: 6px; }
+    .list { margin-top: 6px; max-height: 280px; overflow-y: auto; border-radius: 6px; background: #262626; }
+    .group { display: flex; align-items: center; padding: 6px 8px 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); position: sticky; top: 0; background: #262626; z-index: 1; }
+    .group span { flex: 1; }
+    .group a { text-transform: none; letter-spacing: 0; color: var(--accent); cursor: pointer; font-weight: 600; }
+    .row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer; }
+    .row:hover { background: #333; }
+    .row.on { background: rgba(88, 101, 242, .22); }
+    .row .t { flex: 1; min-width: 0; }
+    .row .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .u { color: var(--dim); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .ck { width: 18px; height: 18px; border-radius: 4px; border: 1.5px solid #666; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 800; }
+    .row.on .ck { background: var(--accent); border-color: var(--accent); }
+    .empty { padding: 12px; color: var(--dim); text-align: center; line-height: 1.5; }
+    .field { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: 8px; margin: 7px 0; }
+    .range { display: flex; align-items: center; gap: 8px; }
+    .range input { flex: 1; accent-color: var(--accent); }
+    .range span { width: 52px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .check { display: flex; align-items: center; gap: 8px; margin: 7px 0; cursor: pointer; }
+    .check input { accent-color: var(--accent); }
+    .hint { color: var(--dim); line-height: 1.5; margin: 6px 0 0; }
+    .hint code { background: #242424; border-radius: 3px; padding: 0 3px; color: var(--text); cursor: pointer; }
+    .err { color: var(--red); margin-top: 6px; line-height: 1.4; }
+    .hidden { display: none !important; }
+    details summary { cursor: pointer; color: var(--dim); margin-top: 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+    .peek { margin-top: 6px; padding: 7px 9px; border-radius: 6px; background: var(--card); line-height: 1.45; word-break: break-word; }
+    .peek small { display: block; color: var(--dim); }
+    .last { padding: 8px 10px; border-radius: 8px; background: var(--card); }
+    .last .sum { display: flex; align-items: center; gap: 8px; }
+    .last .sum b { flex: 1; }
+    .last .res { margin-top: 6px; max-height: 180px; overflow-y: auto; }
+    .last .r { display: flex; gap: 6px; padding: 2px 0; line-height: 1.4; }
+    .last .r i { font-style: normal; width: 14px; flex: none; text-align: center; font-weight: 800; }
+    .last .r.sent i { color: var(--green); }
+    .last .r.failed i { color: var(--red); }
+    .last .r.skipped i, .last .r.waiting i { color: var(--dim); }
+    .last .r.sending i { color: var(--accent); }
+    .last .r em { font-style: normal; color: var(--dim); }
+    .bar { height: 6px; border-radius: 3px; background: #262626; margin-top: 6px; overflow: hidden; }
+    .bar div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+    .tabs { display: flex; gap: 4px; margin: 10px 0 6px; padding: 3px; border-radius: 7px; background: #242424; }
+    .tabs button { flex: 1; padding: 4px 8px; border: none; background: transparent; color: var(--dim); font-weight: 600; }
+    .tabs button.on { background: var(--card); color: var(--text); }
+    .tabs button span { color: var(--dim); font-weight: 400; }
+    .av.ch { border-radius: 8px; background: #4a4a4a; color: var(--text); }
+    .av.ch.sm { border-radius: 7px; }
+    .av.ch.xs { border-radius: 5px; }
+    .row.bad { opacity: .5; cursor: not-allowed; }
+    .tag { display: inline-block; padding: 0 5px; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: .04em; vertical-align: 1px; background: rgba(201, 160, 255, .2); color: var(--spoiler); border: 1px solid var(--spoiler); }
+</style>
+</head>
+<body>
+    <div class="status"><span class="dot" id="dot"></span><span class="txt" id="statusTxt">Connecting…</span><button id="retry" title="Check again">↻</button></div>
+
+    <h3><span class="grow" id="peopleTitle">Send to</span><a id="clearAll" class="danger hidden">Remove all</a></h3>
+    <div class="people" id="people"><span class="none">Nobody yet. Add people or channels below.</span></div>
+
+    <div class="picker">
+        <div class="tabs"><button id="tabPeople" class="on">People</button><button id="tabChannels">Channels</button></div>
+        <div class="searchrow">
+            <input type="text" id="search" placeholder="Search name, or paste user IDs" autocomplete="off" spellcheck="false" />
+            <button id="refresh" title="Refresh suggestions">↻</button>
+        </div>
+        <div class="list" id="list"><div class="empty">Loading suggestions…</div></div>
+        <p class="hint" id="pickHint"></p>
+        <div class="err hidden" id="pickErr"></div>
+    </div>
+
+    <h3>Message</h3>
+    <label class="check"><input type="checkbox" data-setting="sendMessage" /> Send a message with it</label>
+    <div id="messageBox">
+        <textarea id="message" data-setting="message" placeholder="e.g. Hey {name}, your commission is done! 💜" rows="3"></textarea>
+        <p class="hint">Fills in per person or channel: <code data-ins="{name}">{name}</code> <code data-ins="{username}">{username}</code> <code data-ins="{mention}">{mention}</code> <code data-ins="{count}">{count}</code> <code data-ins="{date}">{date}</code> <code data-ins="{time}">{time}</code>. In channels, {name} is the channel name and {mention} stays empty.</p>
+    </div>
+    <p class="hint" id="messageOff">Off: only what's on the clipboard is sent, nothing else.</p>
+
+    <h3>What to send</h3>
+    <div class="field"><label for="content">From the clipboard</label>
+        <select id="content" data-setting="content">
+            <option value="auto">Files, else image, else text</option>
+            <option value="media">Only files or an image</option>
+            <option value="text">Only text</option>
+        </select>
+    </div>
+    <div class="field"><label></label><button id="peekBtn">Check what's on the clipboard</button></div>
+    <div class="peek hidden" id="peek"></div>
+    <p class="hint">Copied files (Explorer / Finder) are sent as they are, up to 10 per message. A copied image goes out as a PNG. Long text becomes a .txt file.</p>
+
+    <h3>Key gestures</h3>
+    <div class="field"><label for="tapAction">Tap</label>
+        <select id="tapAction" data-setting="tapAction" class="gesture"></select></div>
+    <div class="field"><label for="doubleTapAction">Double tap</label>
+        <select id="doubleTapAction" data-setting="doubleTapAction" class="gesture"></select></div>
+    <div class="field"><label for="holdAction">Hold</label>
+        <select id="holdAction" data-setting="holdAction" class="gesture"></select></div>
+    <p class="hint" id="gestureHint"></p>
+
+    <h3>Confirmation</h3>
+    <label class="check"><input type="checkbox" data-setting="confirmKey" /> Press the key again to send</label>
+    <label class="check"><input type="checkbox" data-setting="confirmDiscord" /> Ask in Discord (preview, untick people, spoiler)</label>
+    <div class="field" id="minRow"><label for="confirmMin">Only when sending to</label>
+        <div class="range"><input type="range" min="1" max="20" step="1" data-setting="confirmMin" data-unit="" /><span></span></div></div>
+    <div class="field" id="timeoutRow"><label>Time to press again</label>
+        <div class="range"><input type="range" min="2" max="15" step="1" data-setting="confirmTimeout" data-unit=" s" /><span></span></div></div>
+    <label class="check" id="focusRow"><input type="checkbox" data-setting="confirmFocus" /> Bring Discord to the front for the question</label>
+    <p class="hint" id="confirmHint"></p>
+
+    <h3>Sending</h3>
+    <label class="check"><input type="checkbox" data-setting="silent" /> Send silently (no push notification)</label>
+    <div class="field"><label>Pause between people</label>
+        <div class="range"><input type="range" min="0.5" max="15" step="0.5" data-setting="delay" data-unit=" s" /><span></span></div></div>
+    <p class="hint">Every person gets their own DM and every channel its own message, one after another. A pause keeps Discord's spam filter calm; Vencord's ClipboardSendDeck settings set the shortest pause allowed.</p>
+
+    <h3>Key</h3>
+    <label class="check"><input type="checkbox" data-setting="showLabel" /> Show a label on the key</label>
+    <div class="field" id="labelRow"><label for="label">Label</label><input type="text" id="label" data-setting="label" placeholder="Default: who it goes to" maxlength="40" /></div>
+
+    <h3><span class="grow">Last send</span><a id="cancelBtn" class="danger hidden">Stop</a><a id="retryBtn" class="hidden">Retry failed</a></h3>
+    <div class="last" id="last"><span style="color: var(--dim)">Nothing sent from this key yet.</span></div>
+
+    <details>
+        <summary>Timing</summary>
+        <div class="field"><label>Hold after</label><div class="range"><input type="range" min="300" max="1500" step="50" data-setting="holdDelay" data-unit=" ms" /><span></span></div></div>
+        <div class="field"><label>Double-tap window</label><div class="range"><input type="range" min="150" max="700" step="25" data-setting="doubleTapWindow" data-unit=" ms" /><span></span></div></div>
+    </details>
+
+    <details>
+        <summary>Connection</summary>
+        <div class="field"><label for="port">Port</label><input type="number" id="port" min="1025" max="65535" /></div>
+        <p class="hint">Must match the port in Discord → Vencord → Plugins → ClipboardSendDeck (default 37322).</p>
+    </details>
+
+<script>
+    const DEFAULTS = {
+        recipients: [], label: "", showLabel: true,
+        tapAction: "send", doubleTapAction: "spoiler", holdAction: "peek",
+        confirmKey: true, confirmDiscord: false, confirmMin: 1, confirmTimeout: 5, confirmFocus: true,
+        content: "auto", sendMessage: false, message: "", silent: false, delay: 1.5,
+        holdDelay: 500, doubleTapWindow: 300
+    };
+    const GESTURES = [["send", "Send"], ["spoiler", "Send as spoiler"], ["ask", "Send, ask in Discord first"], ["peek", "Show what's on the clipboard"], ["none", "Nothing"]];
+    const GROUPS = [["dm", "Recent DMs"], ["call", "In your call"], ["frequent", "You talk to most"], ["friend", "Friends"]];
+    const CH_GROUPS = [["here", "This channel"], ["recent", "Recent channels"], ["group", "Group DMs"]];
+    const ID_RE = /^\d{15,22}$/;
+    const LINK_RE = /discord(?:app)?\.com\/channels\/(?:@me|\d{15,22})\/(\d{15,22})/i;
+    const MAX_PEOPLE = 100;
+
+    let ws = null, uuid = null, actionUUID = null, settings = {};
+    let users = [], channels = [], chResults = null, chQuery = "", chTimer = null, tab = "people";
+    let online = false, info = null, lookups = [], clearArmed = false, clearTimer = null, lastJob = null;
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[c]);
+    const initials = n => (String(n || "?").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2) || "?").toUpperCase();
+    const isCh = u => u && u.kind === "channel";
+    const avatar = (u, cls) => {
+        const c = isCh(u) ? cls + " ch" : cls;
+        if (u && u.avatar) return `<img class="av ${c}" src="${esc(u.avatar)}" alt="">`;
+        return `<div class="av ${c}">${isCh(u) ? (u.sub === "Group DM" ? "👥" : "#") : esc(initials(u && u.name))}</div>`;
+    };
+    const keyOf = u => `${isCh(u) ? "channel" : "user"}:${u.id}`;
+    const onKey = u => people().some(p => keyOf(p) === keyOf(u));
+    const bytes = n => n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`;
+
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function toPlugin(payload) { send({ event: "sendToPlugin", action: actionUUID, context: uuid, payload }); }
+    function save() { send({ event: "setSettings", context: uuid, payload: settings }); }
+    const val = k => settings[k] === undefined ? DEFAULTS[k] : settings[k];
+    const people = () => Array.isArray(settings.recipients) ? settings.recipients : [];
+
+    // eslint-disable-next-line no-unused-vars
+    function connectElgatoStreamDeckSocket(port, inUUID, registerEvent, inInfo, inActionInfo) {
+        uuid = inUUID;
+        const ai = JSON.parse(inActionInfo);
+        actionUUID = ai.action;
+        settings = (ai.payload && ai.payload.settings) || {};
+        ws = new WebSocket("ws://127.0.0.1:" + port);
+        ws.onopen = () => {
+            send({ event: registerEvent, uuid });
+            send({ event: "getGlobalSettings", context: uuid });
+            toPlugin({ type: "status" });
+            toPlugin({ type: "suggestions" });
+            toPlugin({ type: "job" });
+        };
+        ws.onmessage = e => {
+            const m = JSON.parse(e.data);
+            if (m.event === "sendToPropertyInspector") onPlugin(m.payload || {});
+            else if (m.event === "didReceiveSettings") { settings = m.payload.settings || {}; renderAll(); }
+            else if (m.event === "didReceiveGlobalSettings") { $("port").value = (m.payload.settings && m.payload.settings.port) || 37322; }
+        };
+        renderAll();
+        setInterval(() => toPlugin({ type: "status" }), 4000);
+        setInterval(() => { if (online) toPlugin({ type: "suggestions" }); }, 20000);
+    }
+
+    function onPlugin(p) {
+        if (p.type === "status") {
+            const was = online;
+            online = p.status === "online";
+            info = p.info || info;
+            $("dot").className = "dot " + (online ? "on" : "off");
+            $("statusTxt").innerHTML = online
+                ? `Connected to Discord<small>Upload limit ${info && info.fileLimit ? bytes(info.fileLimit) : "?"} per file${info && info.busy ? " · sending…" : ""}</small>`
+                : `Discord not reachable<small>Start Discord and enable ClipboardSendDeck in Vencord (port ${esc(p.port)})</small>`;
+            if (online && !was) toPlugin({ type: "suggestions" });
+            if (!$("port").value) $("port").value = p.port;
+        } else if (p.type === "suggestions") {
+            if (p.ok) { users = p.data.users || []; channels = p.data.channels || []; }
+            renderList(p.ok ? null : p.error);
+        } else if (p.type === "channels") {
+            if (p.ok && p.q === chQuery) { chResults = p.data.channels || []; renderList(); }
+        } else if (p.type === "lookup") {
+            if (!p.ok) { showErr(p.error); return nextLookup(); }
+            const u = p.data;
+            if (!u.known) showErr(u.kind === "channel" ? `Can't see channel ${u.id}` : `Nothing found for ${u.id} (not a user or a channel you can see)`);
+            else if (u.problem) showErr(`${u.name}: ${u.problem}`);
+            else addPerson(u);
+            nextLookup();
+        } else if (p.type === "peek") {
+            const el = $("peek");
+            el.classList.remove("hidden");
+            if (!p.ok) { el.innerHTML = `<span style="color: var(--red)">${esc(p.error)}</span>`; return; }
+            const s = p.data;
+            if (s.kind === "empty") el.innerHTML = `Nothing to send on the clipboard<small>${val("content") === "text" ? "Only text is sent by this key." : val("content") === "media" ? "Only files or an image are sent by this key." : "Copy a file, an image or some text."}</small>`;
+            else if (s.kind === "text") el.innerHTML = `Text, ${s.textLength} characters<small>${esc(s.text.slice(0, 160))}${s.text.length > 160 ? "…" : ""}</small>`;
+            else el.innerHTML = `${s.kind === "image" ? "An image" : s.count === 1 ? "1 file" : `${s.count} files`}, ${bytes(s.bytes)}<small>${esc(s.items.slice(0, 5).map(i => `${i.name} (${bytes(i.size)})`).join(" · "))}${s.items.length > 5 ? ` · +${s.items.length - 5} more` : ""}${s.skipped && s.skipped.length ? `<br>Left out: ${esc(s.skipped.join(", "))}` : ""}</small>`;
+        } else if (p.type === "job") {
+            lastJob = p.job || null;
+            renderJob(p.error || null);
+        } else if (p.type === "retry" && !p.ok) {
+            renderJob(p.error);
+        }
+    }
+
+    function showErr(msg) {
+        $("pickErr").textContent = msg || "";
+        $("pickErr").classList.toggle("hidden", !msg);
+    }
+
+    // ── people ──
+    const stored = u => ({ id: u.id, kind: isCh(u) ? "channel" : "user", name: u.name, sub: u.sub || "", username: u.username || "", avatar: u.avatar || "" });
+    // (textOnly isn't stored: permissions can change, the live suggestion says it each time)
+    function addPerson(u) {
+        const list = people();
+        if (onKey(u)) return;
+        if (list.length >= MAX_PEOPLE) return showErr(`At most ${MAX_PEOPLE} per key.`);
+        settings.recipients = [...list, stored(u)];
+        save();
+        renderAll();
+    }
+    function removePerson(key) {
+        settings.recipients = people().filter(x => keyOf(x) !== key);
+        save();
+        renderAll();
+    }
+    function togglePerson(u) {
+        if (onKey(u)) removePerson(keyOf(u)); else addPerson(u);
+    }
+
+    function renderPeople() {
+        const list = people();
+        $("peopleTitle").textContent = list.length ? `Send to (${list.length})` : "Send to";
+        $("clearAll").classList.toggle("hidden", list.length < 2);
+        $("clearAll").textContent = clearArmed ? "Click again to remove all" : "Remove all";
+        if (!list.length) { $("people").innerHTML = `<span class="none">Nobody yet. Add people or channels below.</span>`; return; }
+        $("people").innerHTML = list.map(r => {
+            const pool = isCh(r) ? channels.concat(chResults || []) : users;
+            const u = { ...r, ...(pool.find(x => keyOf(x) === keyOf(r)) || {}) };
+            const tip = isCh(u) ? [u.name, u.sub].filter(Boolean).join(" · ") : (u.username ? "@" + u.username : u.id);
+            return `<span class="pchip" title="${esc(tip)}">${avatar(u, "xs")}<span class="nm">${esc(u.name || u.id)}</span><button class="rm" data-rm="${esc(keyOf(r))}" title="Remove">✕</button></span>`;
+        }).join("");
+    }
+
+    function row(u) {
+        const on = onKey(u);
+        const sub = isCh(u) ? [u.sub, u.textOnly ? "text only, no files" : ""].filter(Boolean).join(" · ") : (u.username ? "@" + u.username : u.id);
+        return `<div class="row ${on ? "on" : ""}" data-key="${esc(keyOf(u))}"><span class="ck">${on ? "✓" : ""}</span>${avatar(u, "sm")}
+            <div class="t"><div class="n">${esc(u.name)}</div><div class="u">${esc(sub)}</div></div></div>`;
+    }
+
+    /** Pasted user / channel IDs and channel links (all tokens must be one of those). */
+    function idsIn(q) {
+        const parts = q.split(/[\s,;]+/).filter(Boolean);
+        return parts.length && parts.every(x => ID_RE.test(x) || LINK_RE.test(x)) ? [...new Set(parts)] : [];
+    }
+    const alreadyHave = t => { const m = LINK_RE.exec(t); const id = m ? m[1] : t; return people().some(p => p.id === id); };
+    const findAny = key => users.concat(channels, chResults || []).find(x => keyOf(x) === key) || people().find(x => keyOf(x) === key);
+
+    function renderList(error) {
+        const raw = $("search").value.trim();
+        const q = raw.toLowerCase();
+        const list = $("list");
+        if (error) { list.innerHTML = `<div class="empty">${esc(error)}</div>`; return; }
+        let html = "";
+        const ids = idsIn(raw).filter(t => !alreadyHave(t));
+        if (ids.length) {
+            const one = ids.length === 1 ? (LINK_RE.test(ids[0]) ? "this channel link" : "ID " + esc(ids[0])) : ids.length + " IDs / links";
+            html += `<div class="row" data-lookup="${esc(ids.join(" "))}"><div class="av sm">ID</div><div class="t"><div class="n">Add ${one}</div><div class="u">Works for people and channels</div></div></div>`;
+        }
+        if (tab === "channels") return renderChannels(list, html, ids.length ? "" : q);
+        const match = u => !q || u.id === q || (u.name || "").toLowerCase().includes(q) || (u.username || "").toLowerCase().includes(q);
+        const seen = new Set();
+        for (const [tag, title] of GROUPS) {
+            const rows = users.filter(u => !seen.has(u.id) && (u.tags || []).includes(tag) && match(u));
+            // Without a search, keep the list short: friends only show when searching.
+            const shown = tag === "friend" && !q ? [] : rows.slice(0, q ? 60 : 15);
+            if (!shown.length) continue;
+            shown.forEach(u => seen.add(u.id));
+            const all = tag !== "friend" && shown.length > 1 && shown.some(u => !people().some(p => p.id === u.id))
+                ? `<a data-addall="${esc(tag)}">Add all</a>` : "";
+            html += `<div class="group"><span>${esc(title)}</span>${all}</div>` + shown.map(row).join("");
+        }
+        // People on this key who aren't suggested anywhere stay reachable by search.
+        const extra = people().filter(p => !isCh(p) && !seen.has(p.id) && q && match(p));
+        if (extra.length) html += `<div class="group"><span>On this key</span></div>` + extra.map(row).join("");
+        if (!html) {
+            html = !online && !users.length
+                ? `<div class="empty">Suggestions appear once Discord is connected.<br>You can still paste user IDs.</div>`
+                : `<div class="empty">${q ? "Nobody found. Paste their user ID instead." : "No suggestions yet. Search your friends or paste user IDs."}</div>`;
+        }
+        list.innerHTML = html;
+    }
+
+    function renderChannels(list, html, q) {
+        const seen = new Set();
+        if (q) {
+            if (chResults === null || chQuery !== q) html += `<div class="empty">Searching…</div>`;
+            else {
+                const rows = chResults.filter(c => !seen.has(c.id));
+                rows.forEach(c => seen.add(c.id));
+                html += rows.length ? `<div class="group"><span>Channels matching “${esc(q)}”</span></div>` + rows.map(row).join("") : `<div class="empty">No channel you can post in matches. Paste its link instead (right-click the channel → Copy Link).</div>`;
+            }
+        } else {
+            for (const [tag, title] of CH_GROUPS) {
+                const rows = channels.filter(c => !seen.has(c.id) && (c.tags || []).includes(tag));
+                if (!rows.length) continue;
+                rows.forEach(c => seen.add(c.id));
+                html += `<div class="group"><span>${esc(title)}</span></div>` + rows.map(row).join("");
+            }
+            const extra = people().filter(p => isCh(p) && !seen.has(p.id));
+            if (extra.length) html += `<div class="group"><span>On this key</span></div>` + extra.map(row).join("");
+            if (!html) html = !online ? `<div class="empty">Channels appear once Discord is connected.<br>You can still paste channel links.</div>` : `<div class="empty">Search a channel or server name, or paste a channel link.</div>`;
+        }
+        list.innerHTML = html;
+    }
+
+    function searchChannels() {
+        const raw = $("search").value.trim();
+        const q = idsIn(raw).length ? "" : raw.toLowerCase();
+        if (tab !== "channels" || !q) { clearTimeout(chTimer); chQuery = ""; chResults = null; return; }
+        if (q === chQuery) return; // same text: the pending / finished search still stands
+        clearTimeout(chTimer);
+        chQuery = q;
+        chResults = null;
+        chTimer = setTimeout(() => toPlugin({ type: "channels", q }), 220);
+    }
+
+    function setTab(t) {
+        tab = t;
+        $("tabPeople").classList.toggle("on", t === "people");
+        $("tabChannels").classList.toggle("on", t === "channels");
+        $("search").placeholder = t === "people" ? "Search name, or paste user IDs" : "Search channel or server, or paste a channel link";
+        $("pickHint").textContent = t === "people"
+            ? "Click someone to add or remove them. Not listed? Paste their user ID, or several at once separated by spaces, commas or new lines (Discord: Settings → Advanced → Developer Mode, then right-click → Copy User ID)."
+            : "Server channels, threads and group DMs. Search by channel or server name (\"art share\" finds #share in Art Club), or paste a channel link (right-click the channel → Copy Link). Forums need a thread link.";
+        chQuery = "";
+        chResults = null;
+        searchChannels();
+        renderList();
+    }
+
+    function lookupIds(ids) {
+        if (!online) return showErr("Discord isn't connected, so IDs can't be looked up right now.");
+        showErr("");
+        const idle = !lookups.length;
+        lookups.push(...ids.filter(id => !lookups.includes(id)));
+        $("search").value = "";
+        renderList();
+        if (idle && lookups.length) nextLookup(true);
+    }
+    function nextLookup(first) {
+        if (!first) lookups.shift();
+        if (!lookups.length) return renderList();
+        $("list").insertAdjacentHTML("afterbegin", `<div class="empty">Looking up ${esc(lookups[0])}… ${lookups.length > 1 ? `(${lookups.length - 1} more)` : ""}</div>`);
+        toPlugin({ type: "lookup", id: lookups[0] });
+    }
+
+    // ── last send ──
+    const MARK = { sent: "✓", failed: "✕", skipped: "–", waiting: "·", sending: "›" };
+    function renderJob(error) {
+        const j = lastJob;
+        const el = $("last");
+        const running = j && (j.state === "sending" || j.state === "queued" || j.state === "confirm");
+        $("cancelBtn").classList.toggle("hidden", !running);
+        $("retryBtn").classList.toggle("hidden", !(j && !running && (j.failed > 0 || (j.state === "cancelled" && j.skipped > 0 && j.sent > 0))));
+        if (!j) {
+            el.innerHTML = error ? `<div class="err" style="margin:0">${esc(error)}</div>` : `<span style="color: var(--dim)">Nothing sent from this key yet.</span>`;
+            return;
+        }
+        const what = j.kind === "text" ? "text" : j.kind === "image" ? "an image" : j.count === 1 ? "1 file" : `${j.count} files`;
+        const when = new Date(j.finishedAt || j.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const head = j.state === "confirm" ? "Waiting for you to confirm in Discord"
+            : j.state === "queued" ? "Waiting for another send to finish"
+            : j.state === "sending" ? `Sending ${what}: ${j.sent + j.failed} of ${j.total}${j.current ? ` (now ${esc(j.current)})` : ""}`
+            : j.state === "cancelled" && !j.sent && !j.failed ? `Not sent${j.error ? `: ${esc(j.error)}` : ""}`
+            : `${what[0].toUpperCase() + what.slice(1)} to ${j.sent} of ${j.total}${j.failed ? `, ${j.failed} failed` : ""}${j.state === "cancelled" ? ", stopped" : ""}`;
+        el.innerHTML = `<div class="sum"><b>${head}</b>${j.spoiler ? `<span class="tag">SPOILER</span>` : ""}<span style="color: var(--dim)">${running ? "" : when}</span></div>`
+            + (running && j.state === "sending" ? `<div class="bar"><div style="width:${Math.round(j.progress * 100)}%"></div></div>` : "")
+            + (j.note ? `<div class="hint" style="color: var(--amber)">${esc(j.note)}</div>` : "")
+            + `<div class="res">${(j.results || []).map(r => `<div class="r ${r.state}"><i>${MARK[r.state] || ""}</i><span>${esc(r.name)}${r.error ? ` <em>· ${esc(r.error)}</em>` : ""}</span></div>`).join("")}</div>`
+            + (error ? `<div class="err">${esc(error)}</div>` : "");
+    }
+
+    // ── fields ──
+    function renderFields() {
+        document.querySelectorAll("select.gesture").forEach(sel => {
+            if (!sel.options.length) sel.innerHTML = GESTURES.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+        });
+        document.querySelectorAll("[data-setting]").forEach(el => {
+            const k = el.dataset.setting, v = val(k);
+            if (el.type === "checkbox") el.checked = !!v;
+            else if (document.activeElement !== el) el.value = v;
+            if (el.type === "range") el.nextElementSibling.textContent = rangeText(k, v, el.dataset.unit);
+        });
+        const ck = !!val("confirmKey"), cd = !!val("confirmDiscord");
+        const asks = [val("tapAction"), val("doubleTapAction"), val("holdAction")].includes("ask");
+        $("minRow").classList.toggle("hidden", !ck && !cd);
+        $("timeoutRow").classList.toggle("hidden", !ck);
+        $("focusRow").classList.toggle("hidden", !cd && !asks);
+        $("labelRow").classList.toggle("hidden", !val("showLabel"));
+        $("messageBox").classList.toggle("hidden", !val("sendMessage"));
+        $("messageOff").classList.toggle("hidden", !!val("sendMessage"));
+        $("confirmHint").textContent = (!ck && !cd ? "Sends as soon as the gesture is recognised."
+            : ck && cd ? "First the key asks (press again), then Discord shows the preview where you can still untick people or switch spoiler on."
+            : ck ? "The key shows what it will send and to how many. Press again to send, hold to cancel, or just wait."
+            : "Discord shows a preview of what you copied and everyone it goes to. Untick people or switch spoiler on there, then Send. Holding the key cancels.")
+            + (asks ? " A gesture set to “Send, ask in Discord first” always shows Discord’s preview, whatever these switches say." : "");
+        const nP = people().filter(p => !isCh(p)).length, nC = people().length - nP;
+        $("tabPeople").innerHTML = `People${nP ? ` <span>${nP}</span>` : ""}`;
+        $("tabChannels").innerHTML = `Channels${nC ? ` <span>${nC}</span>` : ""}`;
+
+        const g = [val("tapAction"), val("doubleTapAction"), val("holdAction")];
+        const notes = [];
+        if (val("doubleTapAction") !== "none") notes.push(`A tap waits ${val("doubleTapWindow")} ms to see if a second tap follows. Set Double tap to Nothing for an instant tap.`);
+        if (!g.includes("send") && !g.includes("spoiler") && !g.includes("ask")) notes.push("No gesture sends anything right now.");
+        $("gestureHint").textContent = notes.join(" ");
+    }
+    function rangeText(k, v, unit) {
+        if (k === "confirmMin") return Number(v) <= 1 ? "always" : `${v}+ people`;
+        return v + (unit || "");
+    }
+
+    function renderAll() { renderFields(); renderPeople(); renderList(); }
+
+    // ── events ──
+    document.querySelectorAll("[data-setting]").forEach(el => {
+        const k = el.dataset.setting;
+        const read = () => el.type === "checkbox" ? el.checked : el.type === "range" ? Number(el.value) : el.value;
+        el.addEventListener("input", () => {
+            if (el.type === "range") el.nextElementSibling.textContent = rangeText(k, el.value, el.dataset.unit);
+        });
+        el.addEventListener("change", () => { settings[k] = read(); save(); renderFields(); });
+    });
+    // Text fields save while typing (debounced), so closing the panel never loses them.
+    for (const id of ["message", "label"]) {
+        let t = null;
+        $(id).addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { settings[id] = $(id).value; save(); }, 400); });
+    }
+    document.querySelectorAll("[data-ins]").forEach(c => c.addEventListener("click", () => {
+        const ta = $("message"), ins = c.dataset.ins;
+        const a = ta.selectionStart ?? ta.value.length, b = ta.selectionEnd ?? ta.value.length;
+        ta.value = ta.value.slice(0, a) + ins + ta.value.slice(b);
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = a + ins.length;
+        settings.message = ta.value;
+        save();
+    }));
+    $("search").addEventListener("input", () => { showErr(""); searchChannels(); renderList(); });
+    $("search").addEventListener("keydown", e => {
+        if (e.key !== "Enter") return;
+        const ids = idsIn($("search").value.trim());
+        if (ids.length) lookupIds(ids.filter(t => !alreadyHave(t)));
+    });
+    $("search").addEventListener("paste", () => setTimeout(() => {
+        // Pasting several IDs, or any channel link, adds them straight away.
+        const raw = $("search").value.trim(), ids = idsIn(raw);
+        if (ids.length > 1 || (ids.length === 1 && LINK_RE.test(ids[0]))) lookupIds(ids.filter(t => !alreadyHave(t)));
+    }, 0));
+    $("tabPeople").addEventListener("click", () => setTab("people"));
+    $("tabChannels").addEventListener("click", () => setTab("channels"));
+    $("list").addEventListener("click", e => {
+        const all = e.target.closest("[data-addall]");
+        if (all) {
+            const tag = all.dataset.addall;
+            const list = people();
+            const add = users.filter(u => (u.tags || []).includes(tag) && !onKey(u)).slice(0, MAX_PEOPLE - list.length);
+            settings.recipients = [...list, ...add.map(stored)];
+            save();
+            return renderAll();
+        }
+        const r = e.target.closest(".row");
+        if (!r) return;
+        if (r.dataset.lookup) return lookupIds(r.dataset.lookup.split(" "));
+        const u = findAny(r.dataset.key);
+        if (u) togglePerson(u);
+    });
+    $("people").addEventListener("click", e => {
+        const b = e.target.closest("[data-rm]");
+        if (b) removePerson(b.dataset.rm);
+    });
+    $("clearAll").addEventListener("click", () => {
+        clearTimeout(clearTimer);
+        if (!clearArmed) {
+            clearArmed = true;
+            clearTimer = setTimeout(() => { clearArmed = false; renderPeople(); }, 3000);
+            return renderPeople();
+        }
+        clearArmed = false;
+        settings.recipients = [];
+        save();
+        renderAll();
+    });
+    $("refresh").addEventListener("click", () => toPlugin({ type: "suggestions" }));
+    $("retry").addEventListener("click", () => toPlugin({ type: "reconnect" }));
+    setTab("people");
+    $("peekBtn").addEventListener("click", () => toPlugin({ type: "peek", content: val("content") }));
+    $("retryBtn").addEventListener("click", () => toPlugin({ type: "retry" }));
+    $("cancelBtn").addEventListener("click", () => toPlugin({ type: "cancel" }));
+    $("port").addEventListener("change", () => {
+        const p = Number($("port").value);
+        if (Number.isInteger(p) && p > 1024 && p < 65536) toPlugin({ type: "setPort", port: p });
+    });
+</script>
+</body>
+</html>
