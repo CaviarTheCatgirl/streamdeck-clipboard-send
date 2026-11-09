@@ -258,6 +258,7 @@
             const s = p.data;
             if (s.kind === "empty") el.innerHTML = `Nothing to send on the clipboard<small>${val("content") === "text" ? "Only text is sent by this key." : val("content") === "media" ? "Only files or an image are sent by this key." : "Copy a file, an image or some text."}</small>`;
             else if (s.kind === "text") el.innerHTML = `Text, ${s.textLength} characters<small>${esc(s.text.slice(0, 160))}${s.text.length > 160 ? "…" : ""}</small>`;
+            else if (s.kind === "image" && s.items[0] && s.items[0].width) el.innerHTML = `An image, ${s.items[0].width}×${s.items[0].height}`;
             else el.innerHTML = `${s.kind === "image" ? "An image" : s.count === 1 ? "1 file" : `${s.count} files`}, ${bytes(s.bytes)}<small>${esc(s.items.slice(0, 5).map(i => `${i.name} (${bytes(i.size)})`).join(" · "))}${s.items.length > 5 ? ` · +${s.items.length - 5} more` : ""}${s.skipped && s.skipped.length ? `<br>Left out: ${esc(s.skipped.join(", "))}` : ""}</small>`;
         } else if (p.type === "job") {
             lastJob = p.job || null;

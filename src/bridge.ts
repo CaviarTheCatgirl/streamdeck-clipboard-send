@@ -14,7 +14,7 @@ export const DEFAULT_PORT = 37322;
 
 export type ContentMode = "auto" | "media" | "text";
 
-export interface SnapshotItem { name: string; size: number; type: string; }
+export interface SnapshotItem { name: string; size: number; type: string; width?: number; height?: number; }
 
 export interface Snapshot {
     id: string | null;
@@ -161,8 +161,9 @@ class Bridge extends EventEmitter {
         });
     }
 
-    peek(content: ContentMode): Promise<{ snapshot: Snapshot; }> {
-        return this.request("GET", `/peek?content=${content}`, undefined, 8000);
+    /** quick: holding the key; Discord skips work only a send needs (e.g. making the PNG) */
+    peek(content: ContentMode, quick = false): Promise<{ snapshot: Snapshot; }> {
+        return this.request("GET", `/peek?content=${content}${quick ? "&quick=1" : ""}`, undefined, 8000);
     }
 
     prepare(content: ContentMode): Promise<{ snapshot: Snapshot; }> {

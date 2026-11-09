@@ -136,13 +136,17 @@ const OK_FLASH_MS = 3500;
 const FAIL_FLASH_MS = 8000;
 const NOTICE_MS = 3500;
 const PEEK_MS = 3500;
+/** a key-down read older than this isn't trusted for a hold */
+const PEEK_FRESH_MS = 3000;
+/** show "Checking…" only when the answer takes longer than this */
+const PEEK_BUSY_AFTER_MS = 120;
 const CONFIRM_TICK_MS = 200;
 
 // ── per-key state ───────────────────────────────────────────────────────────
 
 type Mode =
     | { kind: "idle"; }
-    | { kind: "busy"; text: string; }
+    | { kind: "busy"; text: string; peek?: boolean; }
     | { kind: "confirm"; snapshot: Snapshot; spoiler: boolean; until: number; total: number; timer: NodeJS.Timeout; discord: boolean; }
     | { kind: "job"; job: JobView; timer: NodeJS.Timeout | null; }
     | { kind: "flash"; image: string; timer: NodeJS.Timeout; };
@@ -160,6 +164,10 @@ interface Inst {
     holdTimer: NodeJS.Timeout | null;
     tapTimer: NodeJS.Timeout | null;
     holdFired: boolean;
+    /** clipboard read started on key down, so a hold shows it without waiting */
+    peekReq: { at: number; content: ContentMode; p: Promise<{ snapshot: Snapshot; }>; } | null;
+    /** bumped by every peek and every press, so a late answer can't overwrite the key */
+    peekToken: number;
 }
 
 /** Last send and last problem per key, kept while the plugin runs (the settings panel shows them). */
@@ -212,7 +220,9 @@ export class ClipboardSendAction extends SingletonAction<Settings> {
             phase: "idle",
             holdTimer: null,
             tapTimer: null,
-            holdFired: false
+            holdFired: false,
+            peekReq: null,
+            peekToken: 0
         };
         this.insts.set(inst.id, inst);
         bridge.use(1);
@@ -311,12 +321,18 @@ export class ClipboardSendAction extends SingletonAction<Settings> {
         inst.holdTimer = inst.tapTimer = null;
         inst.phase = "idle";
         inst.holdFired = false;
+        inst.peekReq = null;
+        inst.peekToken++;
     }
 
     override onKeyDown(ev: KeyDownEvent<Settings>): void {
         const inst = this.insts.get(ev.action.id);
         if (!inst) return;
-        if (inst.mode.kind === "flash") this.setMode(inst, { kind: "idle" });
+        // A press ends what is on show, including a peek that is still waiting for Discord.
+        if (inst.mode.kind === "flash" || (inst.mode.kind === "busy" && inst.mode.peek)) {
+            inst.peekToken++;
+            this.setMode(inst, { kind: "idle" });
+        }
         if (inst.holdTimer) clearTimeout(inst.holdTimer);
         inst.holdFired = false;
 
@@ -342,6 +358,9 @@ export class ClipboardSendAction extends SingletonAction<Settings> {
             return;
         }
         inst.phase = "first";
+        // Start reading the clipboard now: by the time the hold counts, the answer is
+        // usually there. A peek changes nothing, so a tap simply ignores it.
+        if (inst.s.holdAction === "peek") this.prefetchPeek(inst);
         inst.holdTimer = setTimeout(() => {
             inst.holdTimer = null;
             inst.holdFired = true;
@@ -394,15 +413,42 @@ export class ClipboardSendAction extends SingletonAction<Settings> {
         return this.start(inst, what === "spoiler", what === "ask");
     }
 
+    private prefetchPeek(inst: Inst): void {
+        if (bridge.status !== "online") return; // nothing to ask; the hold reports it
+        const p = bridge.peek(inst.s.content, true);
+        p.catch(() => { }); // only matters if the hold uses it
+        inst.peekReq = { at: Date.now(), content: inst.s.content, p };
+    }
+
     private async peek(inst: Inst): Promise<void> {
+        const token = ++inst.peekToken;
+        const pre = inst.peekReq;
+        inst.peekReq = null;
+        const fresh = pre && pre.content === inst.s.content && Date.now() - pre.at < PEEK_FRESH_MS;
         if (bridge.status !== "online") bridge.check();
+        const req = fresh ? pre.p : bridge.peek(inst.s.content, true);
+
+        // Answer still on its way: say so on the key, so the hold visibly did something.
+        let done = false;
+        setTimeout(() => {
+            if (!done && token === inst.peekToken && inst.mode.kind === "idle") this.setMode(inst, { kind: "busy", text: "Checking…", peek: true });
+        }, PEEK_BUSY_AFTER_MS);
+        const current = () => token === inst.peekToken && (inst.mode.kind === "idle" || (inst.mode.kind === "busy" && !!inst.mode.peek));
+
         try {
-            const { snapshot } = await bridge.peek(inst.s.content);
+            const { snapshot } = await req;
+            done = true;
+            if (!current()) return; // pressed again meanwhile
             const empty = snapshot.kind === "empty";
-            const sub = empty ? (inst.s.content === "text" ? "no text" : inst.s.content === "media" ? "no files / image" : "") : snapshot.kind === "text" ? `${snapshot.textLength} chars` : formatBytes(snapshot.bytes);
+            const px = snapshot.kind === "image" ? snapshot.items[0] : undefined;
+            const sub = empty ? (inst.s.content === "text" ? "no text" : inst.s.content === "media" ? "no files / image" : "")
+                : snapshot.kind === "text" ? `${snapshot.textLength} chars`
+                    : px?.width ? `${px.width}×${px.height}` : formatBytes(snapshot.bytes);
             this.flash(inst, peekImage({ title: empty ? "Clipboard empty" : describeSnapshot(snapshot), sub, empty }), PEEK_MS);
             if (this.inspected === inst.id) await streamDeck.ui.sendToPropertyInspector({ type: "peek", ok: true, data: snapshot as unknown as JsonValue });
         } catch (e) {
+            done = true;
+            if (!current()) return;
             this.notice(inst, (e as Error).message);
         }
     }
