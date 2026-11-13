@@ -162,16 +162,19 @@ class Bridge extends EventEmitter {
     }
 
     /** quick: holding the key; Discord skips work only a send needs (e.g. making the PNG) */
+    // Reading the clipboard can take a few seconds the first time after Discord started (Windows
+    // starts its clipboard reader then). Waiting long enough beats a key that says "failed" while
+    // Discord is about to send anyway.
     peek(content: ContentMode, quick = false): Promise<{ snapshot: Snapshot; }> {
-        return this.request("GET", `/peek?content=${content}${quick ? "&quick=1" : ""}`, undefined, 8000);
+        return this.request("GET", `/peek?content=${content}${quick ? "&quick=1" : ""}`, undefined, 15_000);
     }
 
     prepare(content: ContentMode): Promise<{ snapshot: Snapshot; }> {
-        return this.request("POST", "/prepare", { content }, 8000);
+        return this.request("POST", "/prepare", { content }, 25_000);
     }
 
     send(req: SendRequest): Promise<{ job: JobView; }> {
-        return this.request("POST", "/send", req, 10_000);
+        return this.request("POST", "/send", req, 30_000);
     }
 
     job(id: string): Promise<{ job: JobView; }> {

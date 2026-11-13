@@ -1,6 +1,6 @@
 {
 	"Name": "Discord Clipboard Send",
-	"Version": "1.0.1.0",
+	"Version": "1.1.0.0",
 	"Author": "CaviarTheCatgirl",
 	"Description": "Send what's on your clipboard (files, an image or text) to a list of Discord people with one key: tap to send, double-tap to send as spoiler, with an optional confirmation. Needs the ClipboardSendDeck Vencord plugin.",
 	"UUID": "com.caviarthecatgirl.clipboard-send",
